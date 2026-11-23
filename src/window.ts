@@ -2,7 +2,7 @@ import { SizeHint, Webview } from 'webview-bun';
 import { setAppIcon } from './appIcon';
 import { openUrl } from './browser';
 
-const WIDTH = 1100;
+const WIDTH = 1210;
 const HEIGHT = 900;
 
 // The window has no macOS menu bar, so the usual Cmd shortcuts do nothing unless the page handles them.
