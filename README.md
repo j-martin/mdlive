@@ -57,6 +57,7 @@ The window uses the system WebView through [`webview-bun`](https://github.com/tr
 - A red block with a line through the text is a removed block.
 - A block with a yellow bar is a modified block. `<ins>` shows the added words and `<del>` shows the removed words.
 - **◀** and **▶** change the diff base. The oldest step is the commit where the branch forked from `origin/HEAD`. The next steps are the branch commits that changed the file. Without `origin/HEAD`, the steps cover the whole history of the file. Press `[` or `]` to step. **Reset to `<base>`** follows the `--base` ref again. The choice applies to every open window or tab.
+- **Outline** (or `o`) shows a sidebar on the left with the headings of the file. Click a heading to jump to it. The heading of the section at the top of the screen is in bold, and a green or yellow bar marks an added or modified heading. A dot marks a section whose text, up to the next heading, has changes: green for added text only, red for removed text only, yellow otherwise. Removed headings are left out. The sidebar hides when the window is narrower than 1000 pixels. The page remembers the setting.
 - **Hide removed** hides the removed text.
 - **Plain** shows the document without the diff.
 - The **Mode** buttons choose what a click or a selection does: **Edit**, **Open in Obsidian**, **Prompt** or **Review**. Only one mode is on at a time; click the active mode again to turn it off. **Follow**, **Hide removed** and **Plain** are toggle buttons.

@@ -1,4 +1,5 @@
 import { EDITOR_SCRIPT } from './editorScript';
+import { OUTLINE_SCRIPT } from './outlineScript';
 import { PROMPT_SCRIPT } from './promptScript';
 import { REVIEW_SCRIPT } from './reviewScript';
 
@@ -52,6 +53,28 @@ header .mode-buttons button + button { border-left: 1px solid var(--border); }
 header .mode-buttons button[aria-pressed="true"] { background: var(--focus); color: #fff; }
 body { position: relative; }
 body.reviewing main { margin-left: max(24px, calc((100% - 380px - 900px) / 2)); margin-right: 380px; }
+#outline { position: fixed; top: var(--header-height, 0px); bottom: 0; left: 0; z-index: 5; width: 240px; padding: 16px 8px;
+  overflow-y: auto; border-right: 1px solid var(--border); background: var(--bg); font-size: 13px; line-height: 1.4; }
+#outline a { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-left: 3px solid transparent;
+  border-radius: 0 4px 4px 0; color: var(--muted); text-decoration: none; white-space: nowrap; }
+#outline .outline-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#outline .outline-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; }
+#outline .outline-dot.added { background: var(--add-bar); }
+#outline .outline-dot.removed { background: var(--del-bar); }
+#outline .outline-dot.modified { background: var(--mod-bar); }
+body.plain #outline .outline-dot { display: none; }
+#outline a:hover { background: var(--code-bg); color: var(--fg); }
+#outline a.current { background: var(--code-bg); color: var(--fg); font-weight: 600; }
+#outline a.outline-added { border-left-color: var(--add-bar); }
+#outline a.outline-modified { border-left-color: var(--mod-bar); }
+body.plain #outline a { border-left-color: transparent; }
+body.outline-on main { margin-left: max(264px, calc((100% - 900px) / 2)); }
+body.outline-on.reviewing main { margin-left: max(264px, calc((100% - 380px - 900px) / 2)); }
+@media (max-width: 1000px) {
+  #outline { display: none; }
+  body.outline-on main { margin-left: auto; }
+  body.outline-on.reviewing main { margin-left: 24px; }
+}
 #review-panel { position: absolute; top: 0; right: 16px; width: 340px; }
 .thread { position: absolute; left: 0; right: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
   background: var(--code-bg); font-size: 13px; line-height: 1.45; cursor: pointer; }
@@ -438,6 +461,7 @@ const applySnapshot = (snapshot) => {
     renderMermaid();
     prepareEditable();
     renderStats(snapshot.stats);
+    renderOutline();
     trackEdit();
     focusIndex = -1;
   }
@@ -642,6 +666,8 @@ document.addEventListener('keydown', (event) => {
   } else if (event.key === 'i' && current?.canEdit) {
     event.preventDefault();
     setEditMode(true);
+  } else if (event.key === 'o') {
+    outlineBox.click();
   } else if (event.key === '[') {
     stepBase(-1);
   } else if (event.key === ']') {
@@ -812,6 +838,7 @@ const menuItems = () => {
     null,
     toggleItem('Edit', editModeBox, Boolean(current?.canEdit)),
     toggleItem('Open in Obsidian on click', editBox, Boolean(current?.canOpen)),
+    toggleItem('Outline', outlineBox),
     toggleItem('Follow', followBox),
     toggleItem('Hide removed', document.getElementById('hide-removed'), true, noGit),
     toggleItem('Plain', document.getElementById('plain'), true, noGit),
@@ -878,6 +905,7 @@ window.addEventListener('blur', closeContextMenu);
 window.addEventListener('scroll', closeContextMenu, { passive: true });
 
 ${EDITOR_SCRIPT}
+${OUTLINE_SCRIPT}
 ${PROMPT_SCRIPT}
 ${REVIEW_SCRIPT}
 
@@ -931,6 +959,7 @@ export const renderPage = (fileLabel: string): string => `<!doctype html>
         <button id="review-label" data-toggle="review-mode" hidden title="Review the pull request of the branch: select text to leave a draft review comment">Review</button>
       </span>
     </div>
+    <button data-toggle="outline-on" title="Show the headings in a sidebar to jump to them (o)">Outline</button>
     <button data-toggle="follow" title="Scroll to the text that changed on each update">Follow</button>
     <button data-toggle="hide-removed" title="Hide the removed text">Hide removed</button>
     <button data-toggle="plain" title="Show the document without the diff">Plain</button>
@@ -942,6 +971,7 @@ export const renderPage = (fileLabel: string): string => `<!doctype html>
       <input type="checkbox" id="edit-on-click">
       <input type="checkbox" id="prompt-mode">
       <input type="checkbox" id="review-mode">
+      <input type="checkbox" id="outline-on" checked>
       <input type="checkbox" id="follow" checked>
       <input type="checkbox" id="hide-removed">
       <input type="checkbox" id="plain">
@@ -972,6 +1002,7 @@ export const renderPage = (fileLabel: string): string => `<!doctype html>
   </div>
 </div>
 <div id="context-menu" role="menu" hidden></div>
+<nav id="outline" aria-label="Outline" hidden><div id="outline-list"></div></nav>
 <main id="content"></main>
 <aside id="review-panel" hidden></aside>
 <script type="module">${SCRIPT}</script>
