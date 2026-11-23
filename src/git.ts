@@ -23,12 +23,13 @@ const runGit = (cwd: string, args: string[]): GitResult => {
 
 /**
  * Finds the git repository that contains `filePath` and the path of the file relative to its root.
+ * Gives `null` when the file is not inside a git repository.
  */
-export const locateGitFile = (filePath: string): GitFile => {
+export const findGitFile = (filePath: string): GitFile | null => {
   const absolutePath = Fs.realpathSync(filePath);
   const result = runGit(Path.dirname(absolutePath), ['rev-parse', '--show-toplevel']);
   if (!result.ok) {
-    throw new Error(`"${filePath}" is not inside a git repository: ${result.stderr}`);
+    return null;
   }
   const root = Fs.realpathSync(result.stdout.trim());
   return { root, relativePath: Path.relative(root, absolutePath) };

@@ -75,6 +75,7 @@ export const startPullRequestApp = async (config: PullRequestConfig): Promise<Ru
       canOpen: false,
       canPrompt: false,
       canReview: true,
+      inGit: true,
       canEdit: false,
       reviewOnly: true,
       reviewHead: { branch: versions.pullRequest.headRefName, commit: versions.pullRequest.headRefOid },

@@ -33,6 +33,8 @@ mdlive https://github.com/<full-repo-name>/pull/121
 
 `mdlive` shows a Markdown file of the pull request at its head, compared with the commit where the pull request branched from its base, like GitHub. It picks the file from `--file <path>`, else from a `#diff-...` anchor of a link copied from the **Files changed** tab, else the first Markdown file of the pull request. **Review** is the only mode: there is no local file to edit, prompt about or open in Obsidian. New pushes show up within a minute.
 
+Outside a git repository, `mdlive` still renders the file live and keeps Edit, Prompt and Open in Obsidian. It shows no diff, so the diff base steps, **Hide removed**, **Plain**, the change navigation and **Review** are greyed out, and their tooltip says why.
+
 Options:
 
 - `--file <path>`: with a pull request link, the file of the pull request to show.

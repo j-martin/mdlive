@@ -404,6 +404,27 @@ const connect = () => {
   };
 };
 
+const NO_GIT_REASON = 'Needs the file to be in a git repository';
+
+// An unavailable control stays visible but greyed out, and its tooltip tells why.
+const setUnavailable = (element, reason) => {
+  element.dataset.title ??= element.title;
+  element.disabled = reason !== null;
+  element.title = reason ?? element.dataset.title;
+};
+
+const renderGitless = (snapshot) => {
+  const reason = snapshot.inGit ? null : NO_GIT_REASON;
+  const reviewLabel = document.getElementById('review-label');
+  reviewLabel.hidden = !snapshot.canReview && snapshot.inGit;
+  setUnavailable(reviewLabel, reason);
+  for (const id of ['hide-removed', 'plain']) {
+    setUnavailable(document.querySelector('[data-toggle="' + id + '"]'), reason);
+  }
+  setUnavailable(document.getElementById('prev'), reason);
+  setUnavailable(document.getElementById('next'), reason);
+};
+
 const applySnapshot = (snapshot) => {
   // Switching between the local file and the pull request head is not an edit to highlight.
   if (current && current.reviewHead?.commit !== snapshot.reviewHead?.commit) {
@@ -422,8 +443,8 @@ const applySnapshot = (snapshot) => {
   current = snapshot;
   editToggle.hidden = !snapshot.canOpen;
   document.getElementById('prompt-label').hidden = !snapshot.canPrompt;
-  document.getElementById('review-label').hidden = !snapshot.canReview;
   document.getElementById('edit-label').hidden = !snapshot.canEdit;
+  renderGitless(snapshot);
   followReviewHead(snapshot);
   layoutReview();
   applyEditOnClick();
@@ -470,6 +491,19 @@ const commitParts = (entry) => [
 
 const renderBase = () => {
   const snapshot = current;
+  if (!snapshot.inGit) {
+    baseLabel.replaceChildren(...labelParts([['Not in a git repository · no diff', false]]));
+    baseLabel.title = NO_GIT_REASON + ' to show a diff';
+    resetBaseButton.hidden = true;
+    historyBox.hidden = false;
+    for (const button of [olderButton, newerButton]) {
+      setUnavailable(button, NO_GIT_REASON + ' to change the diff base');
+    }
+    historyCount.textContent = '–';
+    return;
+  }
+  setUnavailable(olderButton, null);
+  setUnavailable(newerButton, null);
   if (snapshot.pinnedCommit !== null) {
     const entry = snapshot.history.find((item) => item.commit === snapshot.pinnedCommit);
     baseLabel.replaceChildren(...labelParts(entry ? commitParts(entry) : [['vs ' + snapshot.pinnedCommit.slice(0, 8), false]]));
@@ -686,7 +720,9 @@ const pasteText = async () => {
   document.execCommand('insertText', false, text);
 };
 
-const toggleItem = (label, box, show = true) => ({ label, show, checked: box.checked, run: () => box.click() });
+const toggleItem = (label, box, show = true, unavailable = null) => ({
+  label, show, checked: box.checked, run: () => box.click(), disabled: unavailable !== null, title: unavailable ?? '',
+});
 
 // Every control of the header has an item here, plus the actions on the clicked word.
 // The caret and the target are captured now, because closing the menu clears them before an item runs.
@@ -695,6 +731,8 @@ const menuItems = () => {
   const target = menuTarget;
   const caretOffset = caret && current ? sourceOffsetAt(caret.node, caret.offset, current.source) : null;
   const hasSelection = !window.getSelection().isCollapsed;
+  const inGit = current?.inGit !== false;
+  const noGit = inGit ? null : NO_GIT_REASON;
   return [
     { label: 'Edit here', show: Boolean(current?.canEdit) && !editModeBox.checked && caretOffset !== null, run: () => setEditMode(true, caretOffset) },
     { label: 'Stop editing', show: editModeBox.checked, run: () => setEditMode(false) },
@@ -717,20 +755,20 @@ const menuItems = () => {
     { label: 'Open in Obsidian', show: Boolean(current?.canOpen && target), run: () => openTarget(target) },
     { label: 'Copy', show: hasSelection, run: () => document.execCommand('copy') },
     null,
-    { label: 'Next change', run: () => focusChange(1) },
-    { label: 'Previous change', run: () => focusChange(-1) },
+    { label: 'Next change', disabled: !inGit, title: noGit, run: () => focusChange(1) },
+    { label: 'Previous change', disabled: !inGit, title: noGit, run: () => focusChange(-1) },
     null,
-    { label: 'Older diff base', show: !historyBox.hidden, disabled: olderButton.disabled, run: () => olderButton.click() },
-    { label: 'Newer diff base', show: !historyBox.hidden, disabled: newerButton.disabled, run: () => newerButton.click() },
+    { label: 'Older diff base', show: !historyBox.hidden, disabled: olderButton.disabled, title: olderButton.disabled ? olderButton.title : '', run: () => olderButton.click() },
+    { label: 'Newer diff base', show: !historyBox.hidden, disabled: newerButton.disabled, title: newerButton.disabled ? newerButton.title : '', run: () => newerButton.click() },
     { label: resetBaseButton.textContent, show: !resetBaseButton.hidden, run: () => resetBaseButton.click() },
     null,
     toggleItem('Edit', editModeBox, Boolean(current?.canEdit)),
     toggleItem('Open in Obsidian on click', editBox, Boolean(current?.canOpen)),
     toggleItem('Follow', followBox),
-    toggleItem('Hide removed', document.getElementById('hide-removed')),
-    toggleItem('Plain', document.getElementById('plain')),
+    toggleItem('Hide removed', document.getElementById('hide-removed'), true, noGit),
+    toggleItem('Plain', document.getElementById('plain'), true, noGit),
     toggleItem('Prompt', promptModeBox, Boolean(current?.canPrompt)),
-    toggleItem('Review', reviewModeBox, Boolean(current?.canReview)),
+    toggleItem('Review', reviewModeBox, Boolean(current?.canReview) || !inGit, noGit),
   ].filter((item) => item === null || item.show !== false);
 };
 
@@ -752,6 +790,7 @@ const renderMenu = () => {
       button.setAttribute('aria-checked', String(item.checked));
     }
     button.disabled = Boolean(item.disabled);
+    button.title = item.title ?? '';
     const check = document.createElement('span');
     check.className = 'check';
     check.textContent = item.checked ? '✓' : '';

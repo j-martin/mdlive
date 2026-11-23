@@ -1,6 +1,6 @@
 import * as Fs from 'node:fs';
 import * as Path from 'node:path';
-import { authorDate, lastCommitTouching, listBranchHistory, locateGitFile, readFileAtCommit, resolveCommit, type FileCommit } from './git';
+import { authorDate, lastCommitTouching, listBranchHistory, findGitFile, readFileAtCommit, resolveCommit, type FileCommit } from './git';
 import { buildPrompt, hasHc, listPanes, pickClaudePane, pickHerdrSpace, sendToClaude, startClaude } from './claude';
 import { applyPatches } from './edit';
 import * as Review from './review';
@@ -36,6 +36,8 @@ export type Snapshot = {
   pinnedCommit: string | null;
   /** The commit in `history` whose version of the file is the diff base, or `null` if none. */
   historyCommit: string | null;
+  /** False when the file is not in a git repository, so there is no diff, history or pull request. */
+  inGit: boolean;
   /** True when a click on the page can open the file in Obsidian. */
   canOpen: boolean;
   /** True when a selection can be sent to a Claude Code pane with `hc`. */
@@ -57,20 +59,23 @@ export type Snapshot = {
 
 /**
  * Starts the server, watches the Markdown file and polls the base ref so the page stays up to date.
- * Throws when the file is not in a git repository or the base ref does not resolve.
+ * Throws when the base ref does not resolve in a git repository. Outside a git repository, the page shows no diff.
  */
 export const startApp = (config: AppConfig): RunningApp => {
   const filePath = Path.resolve(config.file);
-  const gitFile = locateGitFile(filePath);
+  const located = findGitFile(filePath);
+  const inGit = located !== null;
+  const realPath = Fs.realpathSync(filePath);
+  const gitFile = located ?? { root: Path.dirname(realPath), relativePath: Path.basename(realPath) };
   const vault = findVault(filePath);
   const canPrompt = hasHc();
-  const canReview = Bun.which('gh') !== null;
+  const canReview = inGit && Bun.which('gh') !== null;
   // In review mode, the page shows the file at the head of the pull request, where review comments go.
   let reviewHead: { pullRequest: Review.PullRequest; content: string } | null = null;
   let renderedSource = '';
 
   let pinnedCommit: string | null = null;
-  let history = listBranchHistory(gitFile.root, gitFile.relativePath);
+  let history = inGit ? listBranchHistory(gitFile.root, gitFile.relativePath) : [];
 
   // A base commit matches the step whose version of the file is the same.
   const findHistoryCommit = (commit: string): string | null => {
@@ -84,10 +89,12 @@ export const startApp = (config: AppConfig): RunningApp => {
     return match?.commit ?? null;
   };
 
-  let baseCommit = resolveCommit(gitFile.root, config.base);
-  let baseContent = readFileAtCommit(gitFile.root, baseCommit, gitFile.relativePath);
-  let baseDate = authorDate(gitFile.root, baseCommit);
-  let historyCommit = findHistoryCommit(baseCommit);
+  let baseCommit = inGit ? resolveCommit(gitFile.root, config.base) : '';
+  let baseContent = inGit ? readFileAtCommit(gitFile.root, baseCommit, gitFile.relativePath) : null;
+  let baseDate = inGit ? authorDate(gitFile.root, baseCommit) : null;
+  let historyCommit = inGit ? findHistoryCommit(baseCommit) : null;
+  // Without a git repository, the file is compared with itself, so nothing shows as changed.
+  const diffBase = (source: string): string | null => (inGit ? baseContent : source);
   let snapshot: Snapshot = {
     base: config.base,
     baseCommit,
@@ -96,6 +103,7 @@ export const startApp = (config: AppConfig): RunningApp => {
     history,
     pinnedCommit,
     historyCommit,
+    inGit,
     canOpen: vault !== null,
     canPrompt,
     canReview,
@@ -124,6 +132,7 @@ export const startApp = (config: AppConfig): RunningApp => {
       history,
       pinnedCommit,
       historyCommit,
+      inGit,
       canOpen: vault !== null,
       canPrompt,
       canReview,
@@ -133,7 +142,7 @@ export const startApp = (config: AppConfig): RunningApp => {
     };
     try {
       const source = reviewHead?.content ?? Fs.readFileSync(filePath, 'utf8');
-      const result = renderMarkdownDiff(baseContent, source);
+      const result = renderMarkdownDiff(diffBase(source), source);
       renderedSource = source;
       return { ...base, source: normalizeSource(source), html: result.html, stats: result.stats, error: null };
     } catch (error) {
@@ -145,6 +154,9 @@ export const startApp = (config: AppConfig): RunningApp => {
   const server = startServer(config.port, gitFile.relativePath, {
     current: () => snapshot,
     selectBase: (commit) => {
+      if (!inGit) {
+        throw new Error(`${gitFile.relativePath} is not in a git repository`);
+      }
       if (commit !== null && !history.some((entry) => entry.commit === commit)) {
         throw new Error(`Commit "${commit}" is not a diff base of ${gitFile.relativePath} on this branch`);
       }
@@ -162,7 +174,6 @@ export const startApp = (config: AppConfig): RunningApp => {
     },
     // Without a Claude Code pane on the file, a new one starts at the repository root.
     promptClaude: async (request) => {
-      const realPath = Fs.realpathSync(filePath);
       const panes = await listPanes();
       const pane = pickClaudePane(panes.filter((item) => item.agent === 'claude-code'), realPath);
       const cwd = pane?.cwd ?? gitFile.root;
@@ -205,7 +216,7 @@ export const startApp = (config: AppConfig): RunningApp => {
       Fs.writeFileSync(filePath, applyPatches(current, patches));
     },
     renderSource: (source) => {
-      const result = renderMarkdownDiff(baseContent, source);
+      const result = renderMarkdownDiff(diffBase(source), source);
       return { ...snapshot, source: normalizeSource(source), html: result.html, stats: result.stats, error: null };
     },
   });
@@ -244,7 +255,7 @@ export const startApp = (config: AppConfig): RunningApp => {
     }
   });
 
-  setInterval(() => {
+  const pollBase = (): void => {
     try {
       const latest = listBranchHistory(gitFile.root, gitFile.relativePath);
       const historyChanged = latest.map((entry) => entry.commit).join() !== history.map((entry) => entry.commit).join();
@@ -260,9 +271,12 @@ export const startApp = (config: AppConfig): RunningApp => {
     } catch (error) {
       console.error(String(error));
     }
-  }, BASE_POLL_INTERVAL_MS);
+  };
+  if (inGit) {
+    setInterval(pollBase, BASE_POLL_INTERVAL_MS);
+  }
 
-  console.log(`mdlive: ${gitFile.relativePath} vs ${config.base} (${baseCommit.slice(0, 8)})`);
+  console.log(inGit ? `mdlive: ${gitFile.relativePath} vs ${config.base} (${baseCommit.slice(0, 8)})` : `mdlive: ${gitFile.relativePath} (not in a git repository, no diff)`);
   console.log(`mdlive: ${server.url}`);
   return { url: server.url, fileLabel: gitFile.relativePath };
 };

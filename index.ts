@@ -8,6 +8,7 @@ import type { WorkerMessage } from './src/worker';
 const USAGE = `Usage: mdlive <file.md | pull request link> [options]
 
 Render a Markdown file in a window, update it live, and show the git diff inline.
+Outside a git repository, the file is rendered without a diff.
 With a GitHub pull request link, show a Markdown file of the pull request to review it.
 
 Options:
