@@ -188,6 +188,7 @@ const patchSource = (from, to, text) => {
   localSource = localSource.slice(0, from) + text + localSource.slice(to);
   shiftRanges(from, to, text.length);
   scheduleSave();
+  renderCommit();
 };
 
 // Edits that change the structure render without saving. A response for an older source is dropped,

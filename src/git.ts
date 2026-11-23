@@ -108,3 +108,26 @@ export const authorDate = (root: string, commit: string): number | null => {
   const date = Number(result.stdout.trim());
   return result.ok && Number.isFinite(date) && result.stdout.trim() !== '' ? date : null;
 };
+
+/**
+ * Tells whether the file differs from `HEAD`, including when it is untracked.
+ */
+export const hasUncommittedChanges = (root: string, relativePath: string): boolean => {
+  const result = runGit(root, ['status', '--porcelain', '--untracked-files=all', '--', relativePath]);
+  return result.ok && result.stdout.trim() !== '';
+};
+
+/**
+ * Commits the working tree version of the file, and only that file, with `message`.
+ * Other staged changes stay staged. Throws with the git error when the commit fails.
+ */
+export const commitFile = (root: string, relativePath: string, message: string): void => {
+  const add = runGit(root, ['add', '--', relativePath]);
+  if (!add.ok) {
+    throw new Error(`git add failed: ${add.stderr}`);
+  }
+  const commit = runGit(root, ['commit', '--quiet', '--only', '--message', message, '--', relativePath]);
+  if (!commit.ok) {
+    throw new Error(`git commit failed: ${commit.stderr || commit.stdout.trim()}`);
+  }
+};

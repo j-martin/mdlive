@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import * as Fs from 'node:fs';
 import * as Os from 'node:os';
 import * as Path from 'node:path';
-import { authorDate, lastCommitTouching, listBranchHistory, resolveCommit } from './git';
+import { authorDate, commitFile, hasUncommittedChanges, lastCommitTouching, listBranchHistory, resolveCommit } from './git';
 
 let root = '';
 
@@ -103,3 +103,47 @@ describe('authorDate', () => {
   });
 });
 
+
+describe('hasUncommittedChanges', () => {
+  test('is false for a file that matches HEAD', () => {
+    expect(hasUncommittedChanges(root, 'doc.md')).toBe(false);
+  });
+
+  test('is true for a modified file', () => {
+    Fs.writeFileSync(Path.join(root, 'doc.md'), 'modified\n');
+    expect(hasUncommittedChanges(root, 'doc.md')).toBe(true);
+  });
+
+  test('is true for an untracked file', () => {
+    Fs.writeFileSync(Path.join(root, 'new.md'), 'new\n');
+    expect(hasUncommittedChanges(root, 'new.md')).toBe(true);
+  });
+});
+
+describe('commitFile', () => {
+  test('commits the changes of the file with the message', () => {
+    commitFile(root, 'doc.md', 'Update doc');
+    expect(git('log', '--max-count=1', '--format=%s')).toBe('Update doc');
+  });
+
+  test('leaves the file without uncommitted changes', () => {
+    expect(hasUncommittedChanges(root, 'doc.md')).toBe(false);
+  });
+
+  test('commits an untracked file', () => {
+    commitFile(root, 'new.md', 'Add new');
+    expect(git('show', '--format=', '--name-only', 'HEAD')).toBe('new.md');
+  });
+
+  test('leaves other staged files out of the commit', () => {
+    Fs.writeFileSync(Path.join(root, 'other.md'), 'staged\n');
+    git('add', 'other.md');
+    Fs.writeFileSync(Path.join(root, 'doc.md'), 'again\n');
+    commitFile(root, 'doc.md', 'Only doc');
+    expect(git('show', '--format=', '--name-only', 'HEAD')).toBe('doc.md');
+  });
+
+  test('throws with the git error when there is nothing to commit', () => {
+    expect(() => commitFile(root, 'doc.md', 'Nothing')).toThrow('git commit failed');
+  });
+});

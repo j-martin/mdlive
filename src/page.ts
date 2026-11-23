@@ -149,6 +149,7 @@ const olderButton = document.getElementById('older');
 const newerButton = document.getElementById('newer');
 const historyCount = document.getElementById('history-count');
 const resetBaseButton = document.getElementById('reset-base');
+const commitButton = document.getElementById('commit');
 let current = null;
 let baseIndex = -1;
 let mermaid = null;
@@ -445,11 +446,56 @@ const applySnapshot = (snapshot) => {
   document.getElementById('prompt-label').hidden = !snapshot.canPrompt;
   document.getElementById('edit-label').hidden = !snapshot.canEdit;
   renderGitless(snapshot);
+  renderCommit();
   followReviewHead(snapshot);
   layoutReview();
   applyEditOnClick();
   renderBase();
 };
+
+let committing = false;
+
+// Edits that are not saved yet count as changes, because the commit saves them first.
+const commitUnavailableReason = () => {
+  if (!current?.inGit) {
+    return NO_GIT_REASON + ' to commit';
+  }
+  if (current.reviewHead !== null) {
+    return 'Leave the Review mode to commit the local file';
+  }
+  if (committing) {
+    return 'Committing…';
+  }
+  return current.canCommit || unsaved.length > 0 ? null : 'No uncommitted changes in this file';
+};
+
+const renderCommit = () => {
+  commitButton.hidden = !current?.canEdit;
+  setUnavailable(commitButton, commitUnavailableReason());
+};
+
+const commitChanges = async () => {
+  if (commitUnavailableReason() !== null) {
+    return;
+  }
+  committing = true;
+  renderCommit();
+  try {
+    await saveEdits();
+    if (unsaved.length > 0) {
+      return;
+    }
+    const response = await fetch('/commit', { method: 'POST' });
+    if (!response.ok) {
+      showEditError(await response.text());
+    }
+  } finally {
+    committing = false;
+    renderCommit();
+  }
+};
+
+commitButton.onclick = commitChanges;
 
 const RELATIVE_UNITS = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
 const relativeTime = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
@@ -762,6 +808,8 @@ const menuItems = () => {
     { label: 'Newer diff base', show: !historyBox.hidden, disabled: newerButton.disabled, title: newerButton.disabled ? newerButton.title : '', run: () => newerButton.click() },
     { label: resetBaseButton.textContent, show: !resetBaseButton.hidden, run: () => resetBaseButton.click() },
     null,
+    { label: 'Commit', show: !commitButton.hidden, disabled: commitButton.disabled, title: commitButton.disabled ? commitButton.title : '', run: commitChanges },
+    null,
     toggleItem('Edit', editModeBox, Boolean(current?.canEdit)),
     toggleItem('Open in Obsidian on click', editBox, Boolean(current?.canOpen)),
     toggleItem('Follow', followBox),
@@ -888,6 +936,7 @@ export const renderPage = (fileLabel: string): string => `<!doctype html>
     <button data-toggle="plain" title="Show the document without the diff">Plain</button>
     <button id="prev" title="Previous change (p)">↑</button>
     <button id="next" title="Next change (n)">↓</button>
+    <button id="commit" title="Save the edits and commit this file, and only this file, to git">Commit</button>
     <div class="state" hidden>
       <input type="checkbox" id="edit-mode">
       <input type="checkbox" id="edit-on-click">

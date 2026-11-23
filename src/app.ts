@@ -1,6 +1,6 @@
 import * as Fs from 'node:fs';
 import * as Path from 'node:path';
-import { authorDate, lastCommitTouching, listBranchHistory, findGitFile, readFileAtCommit, resolveCommit, type FileCommit } from './git';
+import { authorDate, commitFile, hasUncommittedChanges, lastCommitTouching, listBranchHistory, findGitFile, readFileAtCommit, resolveCommit, type FileCommit } from './git';
 import { buildPrompt, hasHc, listPanes, pickClaudePane, pickHerdrSpace, sendToClaude, startClaude } from './claude';
 import { applyPatches } from './edit';
 import * as Review from './review';
@@ -46,6 +46,8 @@ export type Snapshot = {
   canReview: boolean;
   /** True when the page can edit the file, which needs a local file. */
   canEdit: boolean;
+  /** True when the local file has changes that are not committed to git. */
+  canCommit: boolean;
   /** True when Review is the only mode, for a pull request opened by its link. */
   reviewOnly: boolean;
   /** The version of the pull request head that the page shows in review mode, or `null` for the local file. */
@@ -108,6 +110,7 @@ export const startApp = (config: AppConfig): RunningApp => {
     canPrompt,
     canReview,
     canEdit: true,
+    canCommit: false,
     reviewOnly: false,
     reviewHead: null,
     source: '',
@@ -137,6 +140,7 @@ export const startApp = (config: AppConfig): RunningApp => {
       canPrompt,
       canReview,
       canEdit: true,
+      canCommit: inGit && reviewHead === null && hasUncommittedChanges(gitFile.root, gitFile.relativePath),
       reviewOnly: false,
       reviewHead: reviewHead && { branch: reviewHead.pullRequest.headRefName, commit: reviewHead.pullRequest.headRefOid },
     };
@@ -214,6 +218,19 @@ export const startApp = (config: AppConfig): RunningApp => {
     patchSource: (patches) => {
       const current = Fs.readFileSync(filePath, 'utf8');
       Fs.writeFileSync(filePath, applyPatches(current, patches));
+    },
+    // The new commit changes the history and the `HEAD` base, so the base is checked at once.
+    commitFile: () => {
+      if (!inGit) {
+        throw new Error(`${gitFile.relativePath} is not in a git repository`);
+      }
+      if (!hasUncommittedChanges(gitFile.root, gitFile.relativePath)) {
+        throw new Error(`${gitFile.relativePath} has no uncommitted changes`);
+      }
+      commitFile(gitFile.root, gitFile.relativePath, `Update \`${gitFile.relativePath}\``);
+      pollBase();
+      snapshot = rebuild();
+      server.send(snapshot);
     },
     renderSource: (source) => {
       const result = renderMarkdownDiff(diffBase(source), source);

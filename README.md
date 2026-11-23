@@ -33,7 +33,7 @@ mdlive https://github.com/<full-repo-name>/pull/121
 
 `mdlive` shows a Markdown file of the pull request at its head, compared with the commit where the pull request branched from its base, like GitHub. It picks the file from `--file <path>`, else from a `#diff-...` anchor of a link copied from the **Files changed** tab, else the first Markdown file of the pull request. **Review** is the only mode: there is no local file to edit, prompt about or open in Obsidian. New pushes show up within a minute.
 
-Outside a git repository, `mdlive` still renders the file live and keeps Edit, Prompt and Open in Obsidian. It shows no diff, so the diff base steps, **Hide removed**, **Plain**, the change navigation and **Review** are greyed out, and their tooltip says why.
+Outside a git repository, `mdlive` still renders the file live and keeps Edit, Prompt and Open in Obsidian. It shows no diff, so the diff base steps, **Hide removed**, **Plain**, the change navigation, **Commit** and **Review** are greyed out, and their tooltip says why.
 
 Options:
 
@@ -61,6 +61,7 @@ The window uses the system WebView through [`webview-bun`](https://github.com/tr
 - **Plain** shows the document without the diff.
 - The **Mode** buttons choose what a click or a selection does: **Edit**, **Open in Obsidian**, **Prompt** or **Review**. Only one mode is on at a time; click the active mode again to turn it off. **Follow**, **Hide removed** and **Plain** are toggle buttons.
 - Right-click on the page for a menu with every control of the header, plus **Edit here** (start editing with the cursor on the clicked word), **Prompt about this…** (ask Claude about the selection or the clicked word), **Open in Obsidian** and **Copy**. Right-click on a link for the browser menu.
+- **Commit** saves the edits on the page, then commits the file with the message ``Update `<file>` ``. The commit has only this file: other staged changes stay staged. The button is greyed out when the file has no uncommitted changes, outside a git repository, and in the **Review** mode. Commit hooks run as usual; if one fails, the page shows its error.
 - Press `n` or `j` to go to the next change. Press `p` or `k` to go to the previous change.
 - The page renders `mermaid` code blocks that did not change.
 - Choose the **Edit** mode (or press `i`) to edit the rendered text in place, and press `Escape` (or click **Edit** again) to stop. The cursor starts in the first text on screen, so the page does not scroll. Changes are saved to the Markdown file when you press `Cmd+S` or `Ctrl+S`, when the page loses focus, after 10 seconds without edits, when you stop editing, and before the window closes:

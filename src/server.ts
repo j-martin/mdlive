@@ -19,6 +19,8 @@ export type ServerHandlers = {
   openSource: (target: ClickTarget) => Promise<void>;
   /** Writes patches to the file, in order. Throws when the file changed where a patch applies. */
   patchSource: (patches: SourcePatch[]) => void;
+  /** Commits the file, and only the file, to git. Throws with the git error when the commit fails. */
+  commitFile: () => void;
   /** Renders `source` like the file, without writing it, and gives the payload a page would receive. */
   renderSource: (source: string) => unknown;
   /** Sends a prompt about the source range to a Claude Code pane and gives the pane address. */
@@ -159,6 +161,15 @@ export const startServer = (port: number, fileLabel: string, handlers: ServerHan
     }
   };
 
+  const commitFile = (): Response => {
+    try {
+      handlers.commitFile();
+      return new Response(null, { status: 204 });
+    } catch (error) {
+      return new Response(errorMessage(error), { status: 500 });
+    }
+  };
+
   const renderSource = async (request: Request): Promise<Response> => {
     const body = (await request.json().catch(() => null)) as { source?: unknown } | null;
     if (typeof body?.source !== 'string') {
@@ -256,6 +267,7 @@ export const startServer = (port: number, fileLabel: string, handlers: ServerHan
       '/open': { POST: openSource },
       '/patch': { POST: patchSource },
       '/render': { POST: renderSource },
+      '/commit': { POST: commitFile },
       '/prompt': { POST: promptClaude },
       '/review': { GET: () => respond(handlers.getReview()) },
       '/review/start': { POST: () => respond(handlers.startReview()) },

@@ -77,6 +77,7 @@ export const startPullRequestApp = async (config: PullRequestConfig): Promise<Ru
       canReview: true,
       inGit: true,
       canEdit: false,
+      canCommit: false,
       reviewOnly: true,
       reviewHead: { branch: versions.pullRequest.headRefName, commit: versions.pullRequest.headRefOid },
       source: normalizeSource(versions.headContent),
@@ -94,6 +95,7 @@ export const startPullRequestApp = async (config: PullRequestConfig): Promise<Ru
     openSource: async () => notAvailable(),
     patchSource: notAvailable,
     renderSource: notAvailable,
+    commitFile: notAvailable,
     promptClaude: async () => notAvailable(),
     ...createReviewHandlers({
       cwd,
