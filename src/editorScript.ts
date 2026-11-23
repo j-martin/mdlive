@@ -6,8 +6,8 @@ import { listContinuation, locateOffset, locateText } from './sourcePosition';
  *
  * Every `beforeinput` event is cancelled and turned into a patch of the Markdown source. An edit inside a single
  * text is also applied to the page at once. Other edits (Enter, edits across formatting, Cmd+B) are rendered by the
- * server without saving, then the caret goes back to the same source offset. The patches are saved together when
- * the page loses focus, after 10 seconds without edits, when editing stops, and before the page closes.
+ * server without saving, then the caret goes back to the same source offset. The patches are saved together on
+ * Cmd+S or Ctrl+S, when the page loses focus, after 10 seconds without edits, when editing stops, and before the page closes.
  */
 export const EDITOR_SCRIPT = `
 const locateOffset = ${locateOffset.toString()};
@@ -490,6 +490,13 @@ content.addEventListener('keydown', (event) => {
     } else {
       undoOrRedo(undoStack, redoStack);
     }
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 's') {
+    event.preventDefault();
+    saveEdits();
   }
 });
 

@@ -63,7 +63,7 @@ The window uses the system WebView through [`webview-bun`](https://github.com/tr
 - Right-click on the page for a menu with every control of the header, plus **Edit here** (start editing with the cursor on the clicked word), **Prompt about this…** (ask Claude about the selection or the clicked word), **Open in Obsidian** and **Copy**. Right-click on a link for the browser menu.
 - Press `n` or `j` to go to the next change. Press `p` or `k` to go to the previous change.
 - The page renders `mermaid` code blocks that did not change.
-- Choose the **Edit** mode (or press `i`) to edit the rendered text in place, and press `Escape` (or click **Edit** again) to stop. The cursor starts in the first text on screen, so the page does not scroll. Changes are saved to the Markdown file when the page loses focus, after 10 seconds without edits, when you stop editing, and before the window closes:
+- Choose the **Edit** mode (or press `i`) to edit the rendered text in place, and press `Escape` (or click **Edit** again) to stop. The cursor starts in the first text on screen, so the page does not scroll. Changes are saved to the Markdown file when you press `Cmd+S` or `Ctrl+S`, when the page loses focus, after 10 seconds without edits, when you stop editing, and before the window closes:
   - Typing, deleting and pasting change the source text under the cursor, so formatting stays as it is.
   - `Enter` starts a new paragraph, or a new item in a list. In a code block it starts a new line.
   - `Cmd+B` and `Cmd+I` make the selection bold or italic. `Cmd+Z` and `Cmd+Shift+Z` undo and redo.
