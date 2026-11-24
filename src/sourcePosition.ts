@@ -135,6 +135,25 @@ export const listContinuation = (markdown: string, offset: number): string => {
 };
 
 /**
+ * Rewrites the spaces of `text` between `from` and `to` so they stay visible on the page: a space at either end
+ * of the text or next to other whitespace becomes a non-breaking space, and any other space becomes a plain space.
+ * This is what browsers do while typing, because the page hides a space at the end of a line or a run of spaces.
+ */
+export const visibleSpaces = (text: string, from: number, to: number): string => {
+  const chars = text.split('');
+  for (let index = Math.max(0, from); index < Math.min(to, chars.length); index += 1) {
+    if (chars[index] !== ' ' && chars[index] !== '\u00a0') {
+      continue;
+    }
+    const previous = chars[index - 1];
+    const next = chars[index + 1];
+    const hidden = previous === undefined || next === undefined || /\s/.test(previous) || /\s/.test(next);
+    chars[index] = hidden ? '\u00a0' : ' ';
+  }
+  return chars.join('');
+};
+
+/**
  * Gives the line and column of an offset in the source, with line endings normalized.
  */
 export const positionAt = (markdown: string, offset: number): SourcePosition => toPosition(normalizeSource(markdown), offset);

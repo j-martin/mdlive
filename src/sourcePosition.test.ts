@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { listContinuation, locateClick, locateOffset, locateText } from './sourcePosition';
+import { listContinuation, locateClick, locateOffset, locateText, visibleSpaces } from './sourcePosition';
 
 const blockOf = (source: string, block: string): { start: number; end: number } => {
   const start = source.indexOf(block);
@@ -126,5 +126,23 @@ describe('trailing whitespace', () => {
   test('finds a source offset after a trailing space of a text', () => {
     const source = 'Version **draft**';
     expect(locateText(source, { start: 0, end: source.length, texts: ['Version ', 'draft'] }, 8)).toEqual({ index: 0, offset: 8 });
+  });
+});
+
+describe('visibleSpaces', () => {
+  test('shows a space typed at the end of a line as a non-breaking space', () => {
+    expect(visibleSpaces('foo ', 2, 5)).toBe('foo\u00a0');
+  });
+
+  test('turns the non-breaking space back into a space once a word follows', () => {
+    expect(visibleSpaces('foo\u00a0b', 2, 5)).toBe('foo b');
+  });
+
+  test('keeps both spaces of a double space visible', () => {
+    expect(visibleSpaces('foo  bar', 2, 6)).toBe('foo\u00a0\u00a0bar');
+  });
+
+  test('leaves spaces outside the range unchanged', () => {
+    expect(visibleSpaces('a  b ', 4, 5)).toBe('a  b\u00a0');
   });
 });

@@ -1,4 +1,4 @@
-import { listContinuation, locateOffset, locateText } from './sourcePosition';
+import { listContinuation, locateOffset, locateText, visibleSpaces } from './sourcePosition';
 
 /**
  * Page script that lets the user edit the rendered text in place. It runs in the same scope as the page script
@@ -13,6 +13,7 @@ export const EDITOR_SCRIPT = `
 const locateOffset = ${locateOffset.toString()};
 const locateText = ${locateText.toString()};
 const listContinuation = ${listContinuation.toString()};
+const visibleSpaces = ${visibleSpaces.toString()};
 
 const editModeBox = document.getElementById('edit-mode');
 const SAVE_IDLE_MS = 10000;
@@ -51,6 +52,9 @@ const sourceTextNodes = (block) => {
   }
   return nodes;
 };
+
+// Typed spaces can show as non-breaking spaces, which are plain spaces in the source.
+const shownText = (node) => node.data.replaceAll('\\u00a0', ' ');
 
 const blockRange = (block) => block.dataset.src.split('-').map(Number);
 
@@ -101,16 +105,17 @@ const sourceOffsetAt = (container, offset, source = localSource) => {
   if (index === -1) {
     return null;
   }
-  return locateOffset(source, { start, end, texts: nodes.slice(0, index + 1).map((node) => node.data), offset: point.offset });
+  return locateOffset(source, { start, end, texts: nodes.slice(0, index + 1).map(shownText), offset: point.offset });
 };
 
 // Checks that the source around the mapped offset shows the same text, so a wrong mapping never edits the file.
 const matchesSource = (node, from, to, startOffset, endOffset) => {
-  if (localSource.slice(from, to) !== node.data.slice(startOffset, endOffset)) {
+  const text = shownText(node);
+  if (localSource.slice(from, to) !== text.slice(startOffset, endOffset)) {
     return false;
   }
-  const before = node.data.slice(0, startOffset).trimStart().slice(-6);
-  const after = node.data.slice(endOffset).trimEnd().slice(0, 6);
+  const before = text.slice(0, startOffset).trimStart().slice(-6);
+  const after = text.slice(endOffset).trimEnd().slice(0, 6);
   return localSource.slice(from - before.length, from) === before && localSource.slice(to, to + after.length) === after;
 };
 
@@ -234,7 +239,7 @@ const placeCaret = (offset) => {
   }
   const [start, end] = blockRange(block);
   const nodes = sourceTextNodes(block);
-  const texts = nodes.map((node) => node.data);
+  const texts = nodes.map(shownText);
   const position = locateText(localSource, { start, end, texts }, offset);
   const selection = window.getSelection();
   const shown = position && locateOffset(localSource, { start, end, texts: texts.slice(0, position.index + 1), offset: position.offset }) === offset;
@@ -467,6 +472,7 @@ content.addEventListener('beforeinput', (event) => {
     recordUndo(from, localSource.slice(from, to), text);
     patchSource(from, to, text);
     node.replaceData(range.startOffset, range.endOffset - range.startOffset, text);
+    node.data = visibleSpaces(node.data, range.startOffset - 1, range.startOffset + text.length + 1);
     window.getSelection().collapse(node, range.startOffset + text.length);
     return;
   }
