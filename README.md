@@ -4,25 +4,33 @@
 
 ## Install
 
-1. Go to `tools/mdlive`.
-2. Run `bun install`.
+Install [`mise`](https://mise.jdx.dev), then run this in the repository:
+
+```sh
+mise run install
+```
+
+This one command does everything:
+
+1. `mise install` installs the tools in `mise.toml` (Bun).
+2. `bun install` installs the dependencies.
+3. `bun run install-bin` builds the binary and installs it in `~/.local/bin`.
+
+To install the binary in a different folder, set `INSTALL_DIR`. Example: `INSTALL_DIR=/usr/local/bin mise run install`.
 
 ## Build a binary
 
 1. Run `bun run build`.
 2. Use the binary at `dist/mdlive`. The binary includes the Bun runtime, so the target machine does not need Bun.
 
-To build the binary and install it in `~/.local/bin`, run `bun run install-bin`. To use a different folder, set `INSTALL_DIR`. Example: `INSTALL_DIR=/usr/local/bin bun run install-bin`.
-
 ## Use
 
 ```sh
-# in repo
-bun ./index.ts README.md --base master
-
-# system
-bun run install-bin
+# installed with `mise run install`
 mdlive <file>.md
+
+# from the repository, without installing
+bun ./index.ts README.md --base master
 ```
 
 To review a pull request without a local checkout, pass its link instead of a file:
